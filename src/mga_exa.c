@@ -438,16 +438,11 @@ PrepareSourceTexture(int tmu, PicturePtr pSrcPicture, PixmapPtr pSrc)
  * mga_fx_* is the size of the fixed point for the TMU
  */
 static void
-setTMIncrementsRegs(PixmapPtr pPix, int X_incx, int X_incy, int X_init,
+setTMIncrementsRegs(MGAPtr pMga, int X_incx, int X_incy, int X_init,
                     int Y_incx, int Y_incy, int Y_init,
                     int H_incx, int H_incy, int H_init,
-                    int mga_fx_width_size, int mga_fx_height_size)
+                    int decalw, int decalh)
 {
-    PMGA(pPix);
-
-    int decalw = mga_fx_width_size - 16;
-    int decalh = mga_fx_height_size - 16;
-
     /* Convert 16 bits fixpoint -> MGA variable size fixpoint */
     if (decalw >= 0) {
         X_incx <<= decalw;
@@ -622,7 +617,7 @@ mgaComposite(PixmapPtr pDst, int srcx, int srcy, int maskx, int masky,
     t = pMga->currentSrcPicture->transform;
 
     if (t)
-        setTMIncrementsRegs(pMga->currentSrc,
+        setTMIncrementsRegs(pMga,
                             t->matrix[0][0],
                             t->matrix[0][1],
                             t->matrix[0][2] + (srcx << 16),
@@ -632,15 +627,15 @@ mgaComposite(PixmapPtr pDst, int srcx, int srcy, int maskx, int masky,
                             t->matrix[2][0],
                             t->matrix[2][1],
                             t->matrix[2][2],
-                            20 - pMga->src_w2,
-                            20 - pMga->src_h2);
+                            4 - pMga->src_w2,
+                            4 - pMga->src_h2);
     else
-        setTMIncrementsRegs(pMga->currentSrc,
+        setTMIncrementsRegs(pMga,
                             1 << 16, 0, srcx << 16,
                             0, 1 << 16, srcy << 16,
                             0, 0, 1 << 16,
-                            20 - pMga->src_w2,
-                            20 - pMga->src_h2);
+                            4 - pMga->src_w2,
+                            4 - pMga->src_h2);
 
     if (pMga->currentMask) {
         texctl2 = MGA_G400_TC2_MAGIC | MGA_TC2_CKSTRANSDIS | MGA_TC2_DUALTEX;
@@ -651,7 +646,7 @@ mgaComposite(PixmapPtr pDst, int srcx, int srcy, int maskx, int masky,
         t = pMga->currentMaskPicture->transform;
 
         if (t)
-            setTMIncrementsRegs(pMga->currentMask,
+            setTMIncrementsRegs(pMga,
                                 t->matrix[0][0],
                                 t->matrix[0][1],
                                 t->matrix[0][2] + (maskx << 16),
@@ -661,15 +656,15 @@ mgaComposite(PixmapPtr pDst, int srcx, int srcy, int maskx, int masky,
                                 t->matrix[2][0],
                                 t->matrix[2][1],
                                 t->matrix[2][2],
-                                20 - pMga->mask_w2,
-                                20 - pMga->mask_h2);
+                                4 - pMga->mask_w2,
+                                4 - pMga->mask_h2);
         else
-            setTMIncrementsRegs(pMga->currentMask,
+            setTMIncrementsRegs(pMga,
                                 1 << 16, 0, maskx << 16,
                                 0, 1 << 16, masky << 16,
                                 0, 0, 1 << 16,
-                                20 - pMga->mask_w2,
-                                20 - pMga->mask_h2);
+                                4 - pMga->mask_w2,
+                                4 - pMga->mask_h2);
 
         WAITFIFO(1);
         OUTREG(MGAREG_TEXCTL2, texctl2 & ~MGA_TC2_SELECT_TMU1);
