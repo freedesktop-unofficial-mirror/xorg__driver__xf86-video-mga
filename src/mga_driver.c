@@ -535,7 +535,6 @@ static const OptionInfoRec MGAOptions[] = {
     { OPTION_SET_MCLK,		"SetMclk",	OPTV_FREQ,	{0}, FALSE },
     { OPTION_OVERCLOCK_MEM,	"OverclockMem",	OPTV_BOOLEAN,	{0}, FALSE },
     { OPTION_VIDEO_KEY,		"VideoKey",	OPTV_INTEGER,	{0}, FALSE },
-    { OPTION_ROTATE,		"Rotate",	OPTV_ANYSTR,	{0}, FALSE },
     { OPTION_TEXTURED_VIDEO,	"TexturedVideo",OPTV_BOOLEAN,	{0}, FALSE },
     { OPTION_CRTC2HALF,		"Crtc2Half",	OPTV_BOOLEAN,	{0}, FALSE },
     { OPTION_CRTC2RAM,		"Crtc2Ram",	OPTV_INTEGER,	{0}, FALSE },
@@ -1932,35 +1931,6 @@ MGAPreInit(ScrnInfoPtr pScrn, int flags)
 	pScrn->LeaveVT       = fbdevHWLeaveVTWeak();
 	pScrn->ValidMode     = fbdevHWValidModeWeak();
     }
-    pMga->Rotate = 0;
-    if ((s = xf86GetOptValString(pMga->Options, OPTION_ROTATE))) {
-        if(!pMga->MergedFB) {
-            if(!xf86NameCmp(s, "CW")) {
-                pMga->ShadowFB = TRUE;
-                pMga->NoAccel = TRUE;
-                pMga->HWCursor = FALSE;
-                pMga->Rotate = 1;
-                xf86DrvMsg(pScrn->scrnIndex, X_CONFIG,
-                        "Rotating screen clockwise - acceleration disabled\n");
-            } else
-            if(!xf86NameCmp(s, "CCW")) {
-                pMga->ShadowFB = TRUE;
-                pMga->NoAccel = TRUE;
-                pMga->HWCursor = FALSE;
-                pMga->Rotate = -1;
-                xf86DrvMsg(pScrn->scrnIndex, X_CONFIG,
-                        "Rotating screen counter clockwise - acceleration disabled\n");
-            } else {
-                xf86DrvMsg(pScrn->scrnIndex, X_CONFIG,
-                        "\"%s\" is not a valid value for Option \"Rotate\"\n", s);
-                xf86DrvMsg(pScrn->scrnIndex, X_INFO,
-                        "Valid options are \"CW\" or \"CCW\"\n");
-            }
-        } else {
-            xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
-                " -- Rotation disabled.\n");
-        }
-    }
 
     /* Load XAA if needed */
     if (!pMga->NoAccel) {
@@ -3143,12 +3113,6 @@ MGAScreenInit(SCREEN_INIT_ARGS_DECL)
     height = pScrn->virtualY;
     displayWidth = pScrn->displayWidth;
 
-
-    if(pMga->Rotate) {
-	height = pScrn->virtualX;
-	width = pScrn->virtualY;
-    }
-
     if(pMga->ShadowFB) {
  	pMga->ShadowPitch = BitmapBytePad(pScrn->bitsPerPixel * width);
 	pMga->ShadowPtr = malloc(pMga->ShadowPitch * height);
@@ -3292,20 +3256,6 @@ MGAScreenInit(SCREEN_INIT_ARGS_DECL)
 
     if(pMga->ShadowFB) {
 	RefreshAreaFuncPtr refreshArea = MGARefreshArea;
-
-	if(pMga->Rotate) {
-	    if (!pMga->PointerMoved) {
-	    pMga->PointerMoved = pScrn->PointerMoved;
-	    pScrn->PointerMoved = MGAPointerMoved;
-	    }
-
-	   switch(pScrn->bitsPerPixel) {
-	   case 8:	refreshArea = MGARefreshArea8;	break;
-	   case 16:	refreshArea = MGARefreshArea16;	break;
-	   case 24:	refreshArea = MGARefreshArea24;	break;
-	   case 32:	refreshArea = MGARefreshArea32;	break;
-	   }
-	}
 
 	ShadowFBInit(pScreen, refreshArea);
     }

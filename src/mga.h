@@ -66,7 +66,6 @@ typedef enum {
     OPTION_SET_MCLK,
     OPTION_OVERCLOCK_MEM,
     OPTION_VIDEO_KEY,
-    OPTION_ROTATE,
     OPTION_TEXTURED_VIDEO,
     OPTION_CRTC2HALF,
     OPTION_CRTC2RAM,
@@ -571,7 +570,6 @@ typedef struct {
     int			colorKey;
     int			videoKey;
     int			fifoCount;
-    int			Rotate;
     MGAFBLayout		CurrentLayout;
     Bool		DrawTransparent;
     int			MaxBlitDWORDS;
@@ -717,10 +715,6 @@ void MGAPolyArcThinSolid(DrawablePtr, GCPtr, int, xArc*);
 Bool MGADGAInit(ScreenPtr pScreen);
 
 void MGARefreshArea(ScrnInfoPtr pScrn, int num, BoxPtr pbox);
-void MGARefreshArea8(ScrnInfoPtr pScrn, int num, BoxPtr pbox);
-void MGARefreshArea16(ScrnInfoPtr pScrn, int num, BoxPtr pbox);
-void MGARefreshArea24(ScrnInfoPtr pScrn, int num, BoxPtr pbox);
-void MGARefreshArea32(ScrnInfoPtr pScrn, int num, BoxPtr pbox);
 
 void mgaDoSetupForScreenToScreenCopy( ScrnInfoPtr pScrn, int xdir,
     int ydir, int rop, unsigned int planemask, int trans, unsigned int bpp );

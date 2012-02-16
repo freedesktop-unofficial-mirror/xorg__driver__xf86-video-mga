@@ -337,8 +337,6 @@ MGAPreInitMergedFB(ScrnInfoPtr pScrn1, int flags)
     pMga->TexturedVideo = pMga1->TexturedVideo;
     pMga->MergedFB = TRUE;
 
-    pMga->Rotate = 0;
-
     switch (pMga->Chipset) {
     case PCI_CHIP_MGA2064:
     case PCI_CHIP_MGA2164:
