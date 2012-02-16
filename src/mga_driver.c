@@ -1662,13 +1662,11 @@ MGAPreInit(ScrnInfoPtr pScrn, int flags)
 
     pMga->DualHeadEnabled = FALSE;
     if (xf86IsEntityShared(pScrn->entityList[0])) {/* dual-head mode requested*/
-	if (
-	    !MGA_DH_NEEDS_HAL(pMga)) {
+	if (!MGA_DH_NEEDS_HAL(pMga)) {
 	    pMga->DualHeadEnabled = TRUE;
 	} else if (xf86IsPrimInitDone(pScrn->entityList[0])) {
 	    xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
-	 "This card requires the \"mga_hal\" module for dual-head operation\n"
-	 "\tIt can be found at the Matrox web site <http://www.matrox.com>\n");
+		       "Dual head not implemented\n");
 	}
     }
 
@@ -2064,9 +2062,10 @@ MGAPreInit(ScrnInfoPtr pScrn, int flags)
                 "\"Merged Framebuffer\" mode only supported on G450 and G550 boards.\n");
         } else { 
             { 
+		/* was a HAL thing, now isn't a thing */
                 xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
-                    "HALLib not loaded! NOT using \"Merged Framebuffer\" mode.\n");
-            } /* MGA_NOT_HAL */
+                    "NOT using \"Merged Framebuffer\" mode.\n");
+            }
         } /* ISMGAGx50() */
     }
     if (pMga->FBDev) {
@@ -2517,7 +2516,7 @@ MGAPreInit(ScrnInfoPtr pScrn, int flags)
      * driver and if the driver doesn't provide code to set them.  They
      * are not pre-initialised at all.
      */
-    MGA_NOT_HAL(xf86SetCrtcForModes(pScrn, INTERLACE_HALVE_V));
+    xf86SetCrtcForModes(pScrn, INTERLACE_HALVE_V);
 
     /* Set the current mode to the first in the list */
     pScrn->currentMode = pScrn->modes;
@@ -2881,7 +2880,7 @@ MGAModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode)
    }
 #endif
 
-    MGA_NOT_HAL((*pMga->Restore)(pScrn, vgaReg, mgaReg, FALSE));
+    (*pMga->Restore)(pScrn, vgaReg, mgaReg, FALSE);
 
     MGAStormSync(pScrn);
     MGAStormEngineInit(pScrn);
@@ -2962,7 +2961,6 @@ MGAModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode)
         }
         else
         {
-            MGA_NOT_HAL(
                 xf86DrvMsg(pScrn->scrnIndex, X_INFO, "Clock           == %d\n",   mode->Clock);
                 xf86DrvMsg(pScrn->scrnIndex, X_INFO, "BitsPerPixel    == %d\n",   pScrn->bitsPerPixel);
                 OUTREG8(0x1FDE, 0x06);
@@ -2976,7 +2974,6 @@ MGAModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode)
 		            OUTREG8(0x1FDF, 0x14);
                     xf86DrvMsg(pScrn->scrnIndex, X_INFO, "HiPriLvl        == 14h\n");
                 }
-            );
         }
     }
 
@@ -3540,38 +3537,35 @@ MGAAdjustFrame(ADJUST_FRAME_ARGS_DECL)
     pMga = MGAPTR(pScrn);
     pLayout = &pMga->CurrentLayout;
     
-        /* wanted to improve panning granularity problems without risking
-         * compatibility issues. Existing code looked hardware dependent.
-         */
-    MGA_NOT_HAL(
-        if(pMga->ShowCache && y && pScrn->vtSema)
-            y += pScrn->virtualY - 1;
-            
-        Base = (y * pLayout->displayWidth + x + pMga->YDstOrg) >>
-                    (3 - pMga->BppShifts[(pLayout->bitsPerPixel >> 3) - 1]);
+    /* wanted to improve panning granularity problems without risking
+     * compatibility issues. Existing code looked hardware dependent.
+     */
+    if(pMga->ShowCache && y && pScrn->vtSema)
+	y += pScrn->virtualY - 1;
+	
+    Base = (y * pLayout->displayWidth + x + pMga->YDstOrg) >>
+		(3 - pMga->BppShifts[(pLayout->bitsPerPixel >> 3) - 1]);
 
-        if (pLayout->bitsPerPixel == 24) {
-            if (pMga->Chipset == PCI_CHIP_MGAG400 
-                || pMga->Chipset == PCI_CHIP_MGAG550)
-                Base &= ~1;  /*1 Not sure why */
+    if (pLayout->bitsPerPixel == 24) {
+	if (pMga->Chipset == PCI_CHIP_MGAG400 
+	    || pMga->Chipset == PCI_CHIP_MGAG550)
+	    Base &= ~1;  /*1 Not sure why */
 
-            Base *= 3;
-        }
+	Base *= 3;
+    }
 
-        /* find start of retrace */
-        while (INREG8(0x1FDA) & 0x08);
-        while (!(INREG8(0x1FDA) & 0x08));
-        /* wait until we're past the start (fixseg.c in the DDK) */
-        count = INREG(MGAREG_VCOUNT) + 2;
-        while(INREG(MGAREG_VCOUNT) < count);
+    /* find start of retrace */
+    while (INREG8(0x1FDA) & 0x08);
+    while (!(INREG8(0x1FDA) & 0x08));
+    /* wait until we're past the start (fixseg.c in the DDK) */
+    count = INREG(MGAREG_VCOUNT) + 2;
+    while(INREG(MGAREG_VCOUNT) < count);
 
-        OUTREG16(MGAREG_CRTC_INDEX, (Base & 0x00FF00) | 0x0C);
-        OUTREG16(MGAREG_CRTC_INDEX, ((Base & 0x0000FF) << 8) | 0x0D);
-        OUTREG8(MGAREG_CRTCEXT_INDEX, 0x00);
-        tmp = INREG8(MGAREG_CRTCEXT_DATA);
-        OUTREG8(MGAREG_CRTCEXT_DATA, (tmp & 0xF0) | ((Base & 0x0F0000) >> 16));
-    );
-
+    OUTREG16(MGAREG_CRTC_INDEX, (Base & 0x00FF00) | 0x0C);
+    OUTREG16(MGAREG_CRTC_INDEX, ((Base & 0x0000FF) << 8) | 0x0D);
+    OUTREG8(MGAREG_CRTCEXT_INDEX, 0x00);
+    tmp = INREG8(MGAREG_CRTCEXT_DATA);
+    OUTREG8(MGAREG_CRTCEXT_DATA, (tmp & 0xF0) | ((Base & 0x0F0000) >> 16));
 }
 
 void
@@ -3584,20 +3578,18 @@ MGAAdjustFrameCrtc2(ADJUST_FRAME_ARGS_DECL)
 
     pMga = MGAPTR(pScrn);
     pLayout = &pMga->CurrentLayout;
-    MGA_NOT_HAL(
-        if(pMga->ShowCache && y && pScrn->vtSema)
-            y += pScrn->virtualY - 1;
+    if(pMga->ShowCache && y && pScrn->vtSema)
+	y += pScrn->virtualY - 1;
 
-        /* 3-85 c2offset
-            * 3-93 c2startadd0
-            * 3-96 c2vcount
-            */
+    /* 3-85 c2offset
+	* 3-93 c2startadd0
+	* 3-96 c2vcount
+	*/
 
-        Base = (y * pLayout->displayWidth + x) * pLayout->bitsPerPixel >> 3;
-        Base += pMga->DstOrg;
-        Base &= 0x01ffffc0;
-        OUTREG(MGAREG_C2STARTADD0, Base);
-    );
+    Base = (y * pLayout->displayWidth + x) * pLayout->bitsPerPixel >> 3;
+    Base += pMga->DstOrg;
+    Base &= 0x01ffffc0;
+    OUTREG(MGAREG_C2STARTADD0, Base);
 }
 
 /*
