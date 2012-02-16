@@ -155,7 +155,7 @@ static int MGAEntityIndex = -1;
 
 static const struct mga_device_attributes attribs[] = {
     /* 2064 */
-    [0] = { 1, 0, 0, 1, 0, 0, 0, 0, old_BARs,  
+    [0] = { 1, 0, 0, 1, 0, 0, 0, old_BARs,
 	    (BLK_OPAQUE_EXPANSION | FASTBLT_BUG | USE_LINEAR_EXPANSION),
 	{
 	    { 0, 0 },          /* System VCO frequencies */
@@ -171,7 +171,7 @@ static const struct mga_device_attributes attribs[] = {
     },
 
     /* 1064 */
-    [1] = { 0, 1, 0, 0, 1, 0, 0, 0, probe_BARs,
+    [1] = { 0, 1, 0, 0, 1, 0, 0, probe_BARs,
             (USE_LINEAR_EXPANSION),
 	{
 	    /* There used to be code in MGARamdacInit (mga_dacG.c) that would
@@ -191,7 +191,7 @@ static const struct mga_device_attributes attribs[] = {
     },
 
     /* 2164 */
-    [2] = { 1, 0, 0, 1, 0, 0, 0, 0, new_BARs,
+    [2] = { 1, 0, 0, 1, 0, 0, 0, new_BARs,
             (BLK_OPAQUE_EXPANSION | TRANSC_SOLID_FILL | USE_RECTS_FOR_LINES
 	     | USE_LINEAR_EXPANSION),
 	{
@@ -208,7 +208,7 @@ static const struct mga_device_attributes attribs[] = {
     },
 
     /* 2164 AGP */
-    [3] = { 1, 0, 0, 1, 0, 0, 0, 0, new_BARs,
+    [3] = { 1, 0, 0, 1, 0, 0, 0, new_BARs,
             (BLK_OPAQUE_EXPANSION | TRANSC_SOLID_FILL | USE_RECTS_FOR_LINES
 	     | USE_LINEAR_EXPANSION),
 	{
@@ -225,7 +225,7 @@ static const struct mga_device_attributes attribs[] = {
     },
 
     /* G100 PCI */
-    [4] = { 0, 1, 0, 0, 1, 0, 0, 0, new_BARs,
+    [4] = { 0, 1, 0, 0, 1, 0, 0, new_BARs,
             (MGA_NO_PLANEMASK | USE_LINEAR_EXPANSION),
 	{
 	    { 50000, 230000 }, /* System VCO frequencies */
@@ -241,7 +241,7 @@ static const struct mga_device_attributes attribs[] = {
     },
 
     /* G100 AGP */
-    [5] = { 0, 1, 0, 0, 1, 0, 0, 0, new_BARs,
+    [5] = { 0, 1, 0, 0, 1, 0, 0, new_BARs,
             (MGA_NO_PLANEMASK | USE_LINEAR_EXPANSION),
 	{
 	    { 50000, 230000 }, /* System VCO frequencies */
@@ -257,7 +257,7 @@ static const struct mga_device_attributes attribs[] = {
     },
 
     /* G200 PCI */
-    [6] = { 0, 1, 0, 0, 1, 1, 1, 1, new_BARs,
+    [6] = { 0, 1, 0, 0, 1, 1, 1, new_BARs,
             (TRANSC_SOLID_FILL | TWO_PASS_COLOR_EXPAND | USE_LINEAR_EXPANSION),
 	{
 	    { 50000, 230000 }, /* System VCO frequencies */
@@ -273,7 +273,7 @@ static const struct mga_device_attributes attribs[] = {
     },
 
     /* G200 AGP */
-    [7] = { 0, 1, 0, 0, 1, 1, 1, 1, new_BARs,
+    [7] = { 0, 1, 0, 0, 1, 1, 1, new_BARs,
             (TRANSC_SOLID_FILL | TWO_PASS_COLOR_EXPAND | USE_LINEAR_EXPANSION),
 	{
 	    { 50000, 230000 }, /* System VCO frequencies */
@@ -289,7 +289,7 @@ static const struct mga_device_attributes attribs[] = {
     },
 
     /* G400 / G450 */
-    [8] = { 0, 1, 1, 0, 1, 1, 2, 1, new_BARs,
+    [8] = { 0, 1, 1, 0, 1, 1, 2, new_BARs,
             (TRANSC_SOLID_FILL | TWO_PASS_COLOR_EXPAND | USE_LINEAR_EXPANSION),
 	{
 	    { 50000, 252000 }, /* System VCO frequencies */
@@ -305,7 +305,7 @@ static const struct mga_device_attributes attribs[] = {
     },
 
     /* G550 */
-    [9] = { 0, 1, 1, 0, 1, 1, 2, 1, new_BARs,
+    [9] = { 0, 1, 1, 0, 1, 1, 2, new_BARs,
             (TRANSC_SOLID_FILL | TWO_PASS_COLOR_EXPAND | USE_LINEAR_EXPANSION),
 	{
 	    { 256000, 600000 }, /* System VCO frequencies */
@@ -321,7 +321,7 @@ static const struct mga_device_attributes attribs[] = {
     },
 
     /* G200SE A PCI */
-    [10] = { 0, 1, 0, 0, 1, 0, 0, 1, new_BARs,
+    [10] = { 0, 1, 0, 0, 1, 0, 0, new_BARs,
             (TRANSC_SOLID_FILL | TWO_PASS_COLOR_EXPAND | USE_LINEAR_EXPANSION),
 	{
 	    { 50000, 230000 }, /* System VCO frequencies */
@@ -337,7 +337,7 @@ static const struct mga_device_attributes attribs[] = {
     },
 
     /* G200SE B PCI */
-    [11] = { 0, 1, 0, 0, 1, 0, 0, 1, new_BARs,
+    [11] = { 0, 1, 0, 0, 1, 0, 0, new_BARs,
             (TRANSC_SOLID_FILL | TWO_PASS_COLOR_EXPAND | USE_LINEAR_EXPANSION),
 	{
 	    { 50000, 114000 }, /* System VCO frequencies */
@@ -353,7 +353,7 @@ static const struct mga_device_attributes attribs[] = {
     },
 
     /* G200EV */
-    [12] = { 0, 1, 0, 0, 1, 0, 0, 0, new_BARs,
+    [12] = { 0, 1, 0, 0, 1, 0, 0, new_BARs,
             (TRANSC_SOLID_FILL | TWO_PASS_COLOR_EXPAND | USE_LINEAR_EXPANSION),
 	{
 	    { 50000, 230000 }, /* System VCO frequencies */
@@ -369,7 +369,7 @@ static const struct mga_device_attributes attribs[] = {
     },
 
     /* G200WB */
-    [13] = { 0, 1, 0, 0, 1, 0, 0, 0, new_BARs,
+    [13] = { 0, 1, 0, 0, 1, 0, 0, new_BARs,
             (TRANSC_SOLID_FILL | TWO_PASS_COLOR_EXPAND | USE_LINEAR_EXPANSION),
 	{
 	    { 50000, 230000 }, /* System VCO frequencies */
@@ -385,7 +385,7 @@ static const struct mga_device_attributes attribs[] = {
     },
 
     /* G200EH */
-    [14] = { 0, 1, 0, 0, 1, 0, 0, 0, new_BARs,
+    [14] = { 0, 1, 0, 0, 1, 0, 0, new_BARs,
             (TRANSC_SOLID_FILL | TWO_PASS_COLOR_EXPAND | USE_LINEAR_EXPANSION),
 	{
 	    { 50000, 230000 }, /* System VCO frequencies */
@@ -401,7 +401,7 @@ static const struct mga_device_attributes attribs[] = {
     },
 
     /* G200ER */
-    [15] = { 0, 1, 0, 0, 1, 0, 0, 0, new_BARs,
+    [15] = { 0, 1, 0, 0, 1, 0, 0, new_BARs,
             (TRANSC_SOLID_FILL | TWO_PASS_COLOR_EXPAND | USE_LINEAR_EXPANSION),
 	{
 	    { 50000, 230000 }, /* System VCO frequencies */
