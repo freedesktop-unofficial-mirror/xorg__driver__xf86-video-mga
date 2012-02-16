@@ -40,6 +40,8 @@ mga_drv_la_SOURCES = \
          mga_dh.c \
          mga_driver.c \
          mga_g450pll.c \
+	 mga_g_crtc.c \
+	 mga_g_output.c \
          mga.h \
          mga_hwcurs.c \
          mga_macros.h \
@@ -47,6 +49,7 @@ mga_drv_la_SOURCES = \
          mga_merge.c \
          mga_merge.h \
          mgareg_flags.h \
+	 mga_randr.h \
          mga_reg.h \
          mga_sarea.h \
          mga_shadow.c \

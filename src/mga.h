@@ -89,7 +89,8 @@ typedef enum {
     OPTION_OLDDMA,
     OPTION_PCIDMA,
     OPTION_ACCELMETHOD,
-    OPTION_KVM
+    OPTION_KVM,
+    OPTION_RANDR12,
 } MGAOpts;
 
 
@@ -661,6 +662,7 @@ typedef struct {
     ScrnInfoPtr       pScrn2; /*pointer to second CRTC screeninforec,
                                        if in merged mode */
 /* End of Merged Framebuffer Data */
+    Bool		randr12;
 } MGARec, *MGAPtr;
 
 extern CARD32 MGAAtype[16];

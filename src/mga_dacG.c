@@ -19,6 +19,7 @@
 #include "mga.h"
 #include "mga_macros.h"
 #include "mga_maven.h"
+#include "mga_randr.h"
 
 #include "xf86DDC.h"
 
@@ -48,11 +49,10 @@ static void MGAGRamdacInit(ScrnInfoPtr);
 static void MGAGSave(ScrnInfoPtr, vgaRegPtr, MGARegPtr, Bool);
 static void MGAGRestore(ScrnInfoPtr, vgaRegPtr, MGARegPtr, Bool);
 static Bool MGAGInit(ScrnInfoPtr, DisplayModePtr);
-static void MGAGLoadPalette(ScrnInfoPtr, int, int*, LOCO*, VisualPtr);
 static Bool MGAG_i2cInit(ScrnInfoPtr pScrn);
 
-static void
-MGAG200SEComputePLLParam(ScrnInfoPtr pScrn, long lFo, int *M, int *N, int *P)
+void
+MGAG200SEComputePLLParam(long lFo, int *M, int *N, int *P)
 {
     unsigned int ulComputedFo;
     unsigned int ulFDelta;
@@ -96,8 +96,8 @@ MGAG200SEComputePLLParam(ScrnInfoPtr pScrn, long lFo, int *M, int *N, int *P)
     }
 }
 
-static void
-MGAG200EVComputePLLParam(ScrnInfoPtr pScrn, long lFo, int *M, int *N, int *P)
+void
+MGAG200EVComputePLLParam(long lFo, int *M, int *N, int *P)
 {
     unsigned int ulComputedFo;
     unsigned int ulFDelta;
@@ -140,15 +140,10 @@ MGAG200EVComputePLLParam(ScrnInfoPtr pScrn, long lFo, int *M, int *N, int *P)
 	    }
 	}
     }
-#if DEBUG
-	xf86DrvMsg(pScrn->scrnIndex, X_INFO,
-		   "lFo=%ld n=0x%x m=0x%x p=0x%x \n",
-		   lFo, *N, *M, *P );
-#endif
 }
 
-static void
-MGAG200WBComputePLLParam(ScrnInfoPtr pScrn, long lFo, int *M, int *N, int *P)
+void
+MGAG200WBComputePLLParam(long lFo, int *M, int *N, int *P)
 {
     unsigned int ulComputedFo;
     unsigned int ulFDelta;
@@ -200,15 +195,10 @@ MGAG200WBComputePLLParam(ScrnInfoPtr pScrn, long lFo, int *M, int *N, int *P)
 	    }
 	}
     }
-#if DEBUG
-	xf86DrvMsg(pScrn->scrnIndex, X_INFO,
-		   "lFo=%ld n=0x%x m=0x%x p=0x%x \n",
-		   lFo, *N, *M, *P );
-#endif
 }
 
-static void
-MGAG200EHComputePLLParam(ScrnInfoPtr pScrn, long lFo, int *M, int *N, int *P)
+void
+MGAG200EHComputePLLParam(long lFo, int *M, int *N, int *P)
 {
     unsigned int ulComputedFo;
     unsigned int ulFDelta;
@@ -445,7 +435,8 @@ MGAG200WBPIXPLLSET(ScrnInfoPtr pScrn, MGARegPtr mgaReg)
 #define G200ER_VCOMIN 1056000
 #define G200ER_VCOMAX 1488000
 
-static void MGAG200ERComputePLLParam(ScrnInfoPtr pScrn, long lFo, int *piM, int *piN, int *piP)
+void
+MGAG200ERComputePLLParam(long lFo, int *piM, int *piN, int *piP)
 {
 
     int  ulM;
@@ -890,31 +881,31 @@ MGAGSetPCLK( ScrnInfoPtr pScrn, long f_out )
 	}
 
 	if (pMga->is_G200SE) {
-	    MGAG200SEComputePLLParam(pScrn, f_out, &m, &n, &p);
+	    MGAG200SEComputePLLParam(f_out, &m, &n, &p);
 
 	    pReg->DacRegs[ MGA1064_PIX_PLLC_M ] = m;
 	    pReg->DacRegs[ MGA1064_PIX_PLLC_N ] = n;
 	    pReg->DacRegs[ MGA1064_PIX_PLLC_P ] = p;
 	} else if (pMga->is_G200EV) {
-	    MGAG200EVComputePLLParam(pScrn, f_out, &m, &n, &p);
+	    MGAG200EVComputePLLParam(f_out, &m, &n, &p);
 
 	    pReg->PllM = m;
 	    pReg->PllN = n;
 	    pReg->PllP = p;
 	} else if (pMga->is_G200WB) {
-	    MGAG200WBComputePLLParam(pScrn, f_out, &m, &n, &p);
+	    MGAG200WBComputePLLParam(f_out, &m, &n, &p);
 
 	    pReg->PllM = m;
 	    pReg->PllN = n;
 	    pReg->PllP = p;
-    } else if (pMga->is_G200EH) {
-	    MGAG200EHComputePLLParam(pScrn, f_out, &m, &n, &p);
+	} else if (pMga->is_G200EH) {
+	    MGAG200EHComputePLLParam(f_out, &m, &n, &p);
 
 	    pReg->PllM = m;
 	    pReg->PllN = n;
 	    pReg->PllP = p;		
 	} else if (pMga->is_G200ER) {
-	    MGAG200ERComputePLLParam(pScrn, f_out, &m, &n, &p);
+	    MGAG200ERComputePLLParam(f_out, &m, &n, &p);
 	    pReg->PllM = m;
 	    pReg->PllN = n;
 	    pReg->PllP = p;		
@@ -1375,7 +1366,7 @@ void MGAGLoadPalette(
  * MGAGRestorePalette
  */
 
-static void
+void
 MGAGRestorePalette(ScrnInfoPtr pScrn, unsigned char* pntr)
 {
     MGAPtr pMga = MGAPTR(pScrn);
@@ -1389,7 +1380,7 @@ MGAGRestorePalette(ScrnInfoPtr pScrn, unsigned char* pntr)
 /*
  * MGAGSavePalette
  */
-static void
+void
 MGAGSavePalette(ScrnInfoPtr pScrn, unsigned char* pntr)
 {
     MGAPtr pMga = MGAPTR(pScrn);
@@ -1921,12 +1912,12 @@ mgag_create_i2c_bus(const char *name, unsigned bus_index, unsigned scrn_index)
     I2CBusPtr I2CPtr = xf86CreateI2CBusRec();
 
     if (I2CPtr != NULL) {
-	I2CPtr->BusName = name;
+	I2CPtr->BusName = (char *)name;
 	I2CPtr->scrnIndex = scrn_index;
 	I2CPtr->I2CPutBits = MGAG_I2CPutBits;
 	I2CPtr->I2CGetBits = MGAG_I2CGetBits;
 	I2CPtr->AcknTimeout = 5;
-	I2CPtr->DriverPrivate.ptr = & i2c_priv[bus_index];
+	I2CPtr->DriverPrivate.ptr = (void *)&i2c_priv[bus_index];
 
 	if (!xf86I2CBusInit(I2CPtr)) {
 	    xf86DestroyI2CBusRec(I2CPtr, TRUE, TRUE);

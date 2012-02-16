@@ -99,6 +99,8 @@
 #include "dri.h"
 #endif
 
+#include "mga_randr.h"
+
 #include <unistd.h>
 
 /*
@@ -555,6 +557,7 @@ static const OptionInfoRec MGAOptions[] = {
     { OPTION_PCIDMA,		"ForcePciDma",	OPTV_BOOLEAN,	{0}, FALSE },
     { OPTION_ACCELMETHOD,	"AccelMethod",	OPTV_ANYSTR,	{0}, FALSE },
     { OPTION_KVM,		"KVM",		OPTV_BOOLEAN,	{0}, FALSE },
+    { OPTION_RANDR12,		"RANDR12",	OPTV_BOOLEAN,	{0}, FALSE },
     { -1,			NULL,		OPTV_NONE,	{0}, FALSE }
 };
 
@@ -1375,6 +1378,29 @@ MGAMavenRead(ScrnInfoPtr pScrn, I2CByte reg, I2CByte *val)
 	return TRUE;
 }
 
+static void
+setup_outputs(ScrnInfoPtr scrn)
+{
+    xf86OutputPtr output;
+
+    output = MGAG200EOutputInit(scrn);
+    output->possible_crtcs = 1;
+    output->possible_clones = 1;
+}
+
+static Bool
+crtc_config_resize(ScrnInfoPtr pScrn, int width, int height)
+{
+    pScrn->virtualX = width;
+    pScrn->virtualY = height;
+
+    return TRUE;
+}
+
+static const xf86CrtcConfigFuncsRec crtc_config_funcs = {
+    .resize = crtc_config_resize,
+};
+
 /* Mandatory */
 static Bool
 MGAPreInit(ScrnInfoPtr pScrn, int flags)
@@ -1951,6 +1977,26 @@ MGAPreInit(ScrnInfoPtr pScrn, int flags)
             } /* MGA_NOT_HAL */
         } /* ISMGAGx50() */
     }
+
+    /*
+     * Note this means you can ask for RANDR 1.2 on a chipset where it's not
+     * implemented.  That'll probably crash.  Don't do that.
+     */
+    if (!xf86GetOptValBool(pMga->Options, OPTION_RANDR12, &pMga->randr12)) {
+	switch (pMga->Chipset) {
+	case PCI_CHIP_MGAG200_SE_A_PCI:
+	case PCI_CHIP_MGAG200_SE_B_PCI:
+	case PCI_CHIP_MGAG200_WINBOND_PCI:
+	case PCI_CHIP_MGAG200_EV_PCI:
+	case PCI_CHIP_MGAG200_EH_PCI:
+	case PCI_CHIP_MGAG200_ER_PCI:
+	    pMga->randr12 = TRUE;
+	    break;
+	default:
+	    pMga->randr12 = FALSE;
+	}
+    }
+
     if (pMga->FBDev) {
 	pScrn->SwitchMode    = fbdevHWSwitchModeWeak();
 	pScrn->AdjustFrame   = fbdevHWAdjustFrameWeak();
@@ -2127,32 +2173,60 @@ MGAPreInit(ScrnInfoPtr pScrn, int flags)
     pMga->BppShifts[2] = 0;
     pMga->BppShifts[3] = 2;
 
+    if (pMga->randr12) {
+	xf86CrtcConfigInit(pScrn, &crtc_config_funcs);
+
+	/* who even knows if this is accurate */
+	xf86CrtcSetSizeRange(pScrn, 320, 200, 2560, 1024);
+
+	MGAGCrtc1Init(pScrn);
+	if (pMga->i2cInit)
+	    pMga->i2cInit(pScrn);
+
+	setup_outputs(pScrn);
+    }
+
     /*
      * fill MGAdac struct
      * Warning: currently, it should be after RAM counting
      */
     (*pMga->PreInit)(pScrn);
 
+    if (!pMga->randr12) {
 #if !defined(__powerpc__)
-
-    /* Read and print the Monitor DDC info */
-    pScrn->monitor->DDC = MGAdoDDC(pScrn);
+	/* Read and print the Monitor DDC info */
+	pScrn->monitor->DDC = MGAdoDDC(pScrn);
 #endif /* !__powerpc__ */
 
-    if (!pScrn->monitor->DDC && pMga->is_G200SE) {
-	/* Jam in ranges big enough for 1024x768 */
-	if (!pScrn->monitor->nHsync) {
-	    pScrn->monitor->nHsync = 1;
-	    pScrn->monitor->hsync[0].lo = 31.5;
-	    pScrn->monitor->hsync[0].hi = 48.0;
-	}
-	if (!pScrn->monitor->nVrefresh) {
-	    pScrn->monitor->nVrefresh = 1;
-	    pScrn->monitor->vrefresh[0].lo = 56.0;
-	    pScrn->monitor->vrefresh[0].hi = 75.0;
+	if (!pScrn->monitor->DDC && pMga->is_G200SE) {
+	    /* Jam in ranges big enough for 1024x768 */
+	    if (!pScrn->monitor->nHsync) {
+		pScrn->monitor->nHsync = 1;
+		pScrn->monitor->hsync[0].lo = 31.5;
+		pScrn->monitor->hsync[0].hi = 48.0;
+	    }
+	    if (!pScrn->monitor->nVrefresh) {
+		pScrn->monitor->nVrefresh = 1;
+		pScrn->monitor->vrefresh[0].lo = 56.0;
+		pScrn->monitor->vrefresh[0].hi = 75.0;
+	    }
 	}
     }
-	    
+
+    if (pMga->randr12) {
+	if (!MGAMapMem(pScrn)) {
+	    ErrorF("cannot map memory for probing\n");
+	    return FALSE;
+	}
+
+	if (!xf86InitialConfiguration(pScrn, TRUE)) {
+	    MGAUnmapMem(pScrn);
+	    xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "Initial config failed\n");
+	    return FALSE;
+	}
+
+	MGAUnmapMem(pScrn);
+    }
 
     /*
      * If the driver can do gamma correction, it should call xf86SetGamma()
@@ -2252,7 +2326,7 @@ MGAPreInit(ScrnInfoPtr pScrn, int flags)
      * pScrn->maxVValue are set.  Since our MGAValidMode() already takes
      * care of this, we don't worry about setting them here.
      */
-    {
+    if (!pMga->randr12) {
 	int Pitches1[] =
 	  {640, 768, 800, 960, 1024, 1152, 1280, 1600, 1920, 2048, 0};
 	int Pitches2[] =
@@ -2312,26 +2386,31 @@ MGAPreInit(ScrnInfoPtr pScrn, int flags)
 			      LOOKUP_BEST_REFRESH);
       
 	free(linePitches);
-    }
 
-    if (i < 1 && pMga->FBDev) {
-	fbdevHWUseBuildinMode(pScrn);
-	pScrn->displayWidth = pScrn->virtualX; /* FIXME: might be wrong */
-	i = 1;
-    }
-    if (i == -1) {
-	xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "Validate Modes Failed\n");
-	MGAFreeRec(pScrn);
-	return FALSE;
-    }
+	if (i < 1 && pMga->FBDev) {
+	    fbdevHWUseBuildinMode(pScrn);
+	    pScrn->displayWidth = pScrn->virtualX; /* FIXME: might be wrong */
+	    i = 1;
+	}
+	if (i == -1) {
+	    xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "Validate Modes Failed\n");
+	    MGAFreeRec(pScrn);
+	    return FALSE;
+	}
 
-    /* Prune the modes marked as invalid */
-    xf86PruneDriverModes(pScrn);
+	/* Prune the modes marked as invalid */
+	xf86PruneDriverModes(pScrn);
 
-    if (i == 0 || pScrn->modes == NULL) {
-	xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "No valid modes found\n");
-	MGAFreeRec(pScrn);
-	return FALSE;
+	if (i == 0 || pScrn->modes == NULL) {
+	    xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "No valid modes found\n");
+	    MGAFreeRec(pScrn);
+	    return FALSE;
+	}
+    } else { /* RANDR 1.2 */
+	if (!xf86RandR12PreInit(pScrn)) {
+	    xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "RANDR init failure\n");
+	    return FALSE;
+	}
     }
 
     /* If the Device section explicitly set HasSDRAM, don't bother checking.
@@ -2422,7 +2501,7 @@ MGAPreInit(ScrnInfoPtr pScrn, int flags)
 
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, 2, "YDstOrg is set to %d\n",
 		   pMga->YDstOrg);
-    if(pMga->DualHeadEnabled) {
+    if(pMga->DualHeadEnabled && !pMga->randr12) {
         if(pMga->SecondCrtc == FALSE) {
 	    pMga->FbUsableSize = pMgaEnt->masterFbMapSize;
             /* Allocate HW cursor buffer at the end of video ram */
@@ -2742,11 +2821,32 @@ MGASave(ScrnInfoPtr pScrn)
     (*pMga->Save)(pScrn, vgaReg, mgaReg, pMga->Primary);
 }
 
+static void
+MGARandR12Save(ScrnInfoPtr pScrn)
+{
+    xf86CrtcConfigPtr config = XF86_CRTC_CONFIG_PTR(pScrn);
+    int i;
+
+    /* Save CRTC states */
+    for (i = 0; i < config->num_crtc; i++) {
+	xf86CrtcPtr crtc = config->crtc[i];
+	crtc->funcs->save(crtc);
+    }
+
+    /* Save output states */
+    for (i = 0; i < config->num_output; i++) {
+	xf86OutputPtr output = config->output[i];
+	output->funcs->save(output);
+    }
+}
+
 /*
  * Initialise a new mode.  This is currently still using the old
  * "initialise struct, restore/write struct to HW" model.  That could
  * be changed.
  */
+
+/* JX this is MGASetMode in the branch; needed? */
 
 static Bool
 MGAModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode)
@@ -2797,7 +2897,7 @@ MGAModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode)
     }
 
     /* Reset tagfifo*/ 
-	if (pMga->is_G200ER) 
+    if (pMga->is_G200ER)
     {
         CARD32 ulMemCtl = INREG(MGAREG_MEMCTL);
         CARD8  ucSeq1;
@@ -2823,7 +2923,7 @@ MGAModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode)
      Higher HiPriLvl will reduce drawing performance
      We need to give enough bandwith to crtc to avoid visual artifact
     */
-	if (pMga->is_G200SE) 
+    if (pMga->is_G200SE)
     {
         if (pMga->reg_1e24 >= 0x02)
         {
@@ -2870,12 +2970,12 @@ MGAModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode)
                 xf86DrvMsg(pScrn->scrnIndex, X_INFO, "Clock           == %d\n",   mode->Clock);
                 xf86DrvMsg(pScrn->scrnIndex, X_INFO, "BitsPerPixel    == %d\n",   pScrn->bitsPerPixel);
                 OUTREG8(0x1FDE, 0x06);
-	            if (pMga->reg_1e24 >= 0x01)
+		if (pMga->reg_1e24 >= 0x01)
                 {
 		            OUTREG8(0x1FDF, 0x03);
                     xf86DrvMsg(pScrn->scrnIndex, X_INFO, "HiPriLvl        == 03\n");
                 }
-	            else 
+		else
                 {
 		            OUTREG8(0x1FDF, 0x14);
                     xf86DrvMsg(pScrn->scrnIndex, X_INFO, "HiPriLvl        == 14h\n");
@@ -2998,6 +3098,27 @@ MGARestore(ScrnInfoPtr pScrn)
     }
 }
 
+static void
+MGARandR12Restore(ScrnInfoPtr pScrn)
+{
+    xf86CrtcConfigPtr config = XF86_CRTC_CONFIG_PTR(pScrn);
+    int i;
+
+    if (pScrn->pScreen != NULL)
+	MGAStormSync(pScrn);
+
+    /* Restore CRTC states */
+    for (i = 0; i < config->num_crtc; i++) {
+	xf86CrtcPtr crtc = config->crtc[i];
+	crtc->funcs->restore(crtc);
+    }
+
+    /* Restore output states */
+    for (i = 0; i < config->num_output; i++) {
+	xf86OutputPtr output = config->output[i];
+	output->funcs->restore(output);
+    }
+}
 
 /* Workaround for a G400 CRTC2 display problem */
 static void
@@ -3099,8 +3220,8 @@ MGAScreenInit(SCREEN_INIT_ARGS_DECL)
        pPriv = xf86GetEntityPrivate(pScrn->entityList[0], MGAEntityIndex);
        pMgaEnt = pPriv->ptr;
        pMgaEnt->refCount++;
-    } else {
     }
+
     if (pMga->is_G200SE) {
 	pScrn->videoRam = VRTemp;
 	pMga->FbMapSize = FBTemp;
@@ -3111,7 +3232,14 @@ MGAScreenInit(SCREEN_INIT_ARGS_DECL)
     vgaHWGetIOBase(hwp);
 
     /* Map the VGA memory when the primary video */
-    if (!pMga->FBDev) {
+    if (pMga->randr12) {
+	pScrn->vtSema = TRUE;
+
+	MGARandR12Save(pScrn);
+	xf86SetDesiredModes(pScrn);
+	MGAStormSync(pScrn);
+	MGAStormEngineInit(pScrn);
+    } else if (!pMga->FBDev) {
 	if (pMga->Primary) {
 	    hwp->MapSize = 0x10000;
 	    if (!vgaHWMapMem(pScrn))
@@ -3123,8 +3251,7 @@ MGAScreenInit(SCREEN_INIT_ARGS_DECL)
 	/* Initialise the first mode */
 	if (!MGAModeInit(pScrn, pScrn->currentMode))
 	    return FALSE;
-    }
-    else {
+    } else {
 	fbdevHWSave(pScrn);
 	/* Disable VGA core, and leave memory access on */
 #ifdef XSERVER_LIBPCIACCESS
@@ -3147,8 +3274,10 @@ MGAScreenInit(SCREEN_INIT_ARGS_DECL)
 
     /* Darken the screen for aesthetic reasons and set the viewport 
      */
-    (*pScreen->SaveScreen)(pScreen, SCREEN_SAVER_ON);
-    pScrn->AdjustFrame(ADJUST_FRAME_ARGS(pScrn, pScrn->frameX0, pScrn->frameY0));
+    if (!pMga->randr12) {
+        (*pScreen->SaveScreen)(pScreen, SCREEN_SAVER_ON);
+        pScrn->AdjustFrame(ADJUST_FRAME_ARGS(pScrn, pScrn->frameX0, pScrn->frameY0));
+    }
 
 
     /*
@@ -3195,15 +3324,28 @@ MGAScreenInit(SCREEN_INIT_ARGS_DECL)
      * pScreen fields.
      */
 
-    width = pScrn->virtualX;
+    if (pMga->randr12) {
+	width = displayWidth = pScrn->displayWidth = pScrn->virtualX;
+    } else {
+	width = pScrn->virtualX;
+	displayWidth = pScrn->displayWidth;
+    }
     height = pScrn->virtualY;
-    displayWidth = pScrn->displayWidth;
 
     if(pMga->ShadowFB) {
- 	pMga->ShadowPitch = BitmapBytePad(pScrn->bitsPerPixel * width);
-	pMga->ShadowPtr = malloc(pMga->ShadowPitch * height);
+        /*
+         * I don't really feel like faffing about with resizing the
+         * shadow buffer when the front buffer grows in RANDR, so I'm
+         * just going to allocate enough up front and let the upload hook
+         * correct for width.
+         */
+        if (pMga->randr12)
+            pMga->ShadowPitch = BitmapBytePad(pScrn->bitsPerPixel * 2048);
+        else
+            pMga->ShadowPitch = BitmapBytePad(pScrn->bitsPerPixel * width);
+
 	displayWidth = pMga->ShadowPitch / (pScrn->bitsPerPixel >> 3);
-        FBStart = pMga->ShadowPtr;
+        FBStart = pMga->ShadowPtr = malloc(pMga->ShadowPitch * height);
     } else {
 	pMga->ShadowPtr = NULL;
 	FBStart = pMga->FbStart;
@@ -3284,7 +3426,8 @@ MGAScreenInit(SCREEN_INIT_ARGS_DECL)
     pMga->BlockHandler = pScreen->BlockHandler;
     pScreen->BlockHandler = MGABlockHandler;
 
-    if(!pMga->ShadowFB) /* hardware cursor needs to wrap this layer */
+    /* hardware cursor needs to wrap this layer */
+    if (!pMga->ShadowFB && !pMga->randr12)
 	MGADGAInit(pScreen);
 
     if (!pMga->NoAccel) {
@@ -3295,6 +3438,9 @@ MGAScreenInit(SCREEN_INIT_ARGS_DECL)
 #endif
 	    MGAStormAccelInit(pScreen);
     }
+
+    if (pMga->randr12 && !MGAEnterVT(VT_FUNC_ARGS))
+	return FALSE;
 
     xf86SetBackingStore(pScreen);
     xf86SetSilkenMouse(pScreen);
@@ -3310,7 +3456,7 @@ MGAScreenInit(SCREEN_INIT_ARGS_DECL)
 	    xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
 		"Hardware cursor initialization failed\n");
     }
-    if(pMga->MergedFB) {
+    if (pMga->MergedFB && !pMga->randr12) {
         /* Rotate and MergedFB are mutiualy exclusive, so we can use this 
          * variable.
          */
@@ -3341,10 +3487,21 @@ MGAScreenInit(SCREEN_INIT_ARGS_DECL)
 	ShadowFBInit(pScreen, refreshArea);
     }
 
-    xf86DPMSInit(pScreen, mga_dpms_set_proc, 0);
+    if (pMga->randr12)
+	xf86DPMSInit(pScreen, xf86DPMSSet, 0);
+    else
+	xf86DPMSInit(pScreen, mga_dpms_set_proc, 0);
 
     pScrn->memPhysBase = pMga->FbAddress;
     pScrn->fbOffset = pMga->YDstOrg * (pScrn->bitsPerPixel / 8);
+
+    if (pMga->randr12) {
+	pScreen->SaveScreen = xf86SaveScreen;
+	pMga->CloseScreen = pScreen->CloseScreen;
+	pScreen->CloseScreen = MGACloseScreen;
+
+	xf86CrtcScreenInit(pScreen);
+    }
 
     MGAInitVideo(pScreen);
 
@@ -3366,8 +3523,10 @@ MGAScreenInit(SCREEN_INIT_ARGS_DECL)
 #endif
 
     /* Wrap the current CloseScreen function */
-    pMga->CloseScreen = pScreen->CloseScreen;
-    pScreen->CloseScreen = MGACloseScreen;
+    if (!pMga->randr12) {
+	pMga->CloseScreen = pScreen->CloseScreen;
+	pScreen->CloseScreen = MGACloseScreen;
+    }
 
     /* Report any unused options (only for the first generation) */
     if (serverGeneration == 1) {
@@ -3485,6 +3644,19 @@ MGAAdjustFrameCrtc2(ADJUST_FRAME_ARGS_DECL)
  * We may wish to unmap video/MMIO memory too.
  */
 
+static Bool
+MGARandR12EnterVT(VT_FUNC_ARGS_DECL)
+{
+    SCRN_INFO_PTR(arg);
+    MGAPtr pMga = MGAPTR(pScrn);
+
+    xf86SetDesiredModes(pScrn);
+    MGAStormSync(pScrn);
+    MGAStormEngineInit(pScrn);
+
+    return TRUE;
+}
+
 /* Mandatory */
 static Bool
 MGAEnterVT(VT_FUNC_ARGS_DECL)
@@ -3493,6 +3665,9 @@ MGAEnterVT(VT_FUNC_ARGS_DECL)
     MGAPtr pMga;
 
     pMga = MGAPTR(pScrn);
+
+    if (pMga->randr12)
+	return MGARandR12EnterVT(VT_FUNC_ARGS);
 
 #ifdef MGADRI
     if (pMga->directRenderingEnabled) {
@@ -3564,7 +3739,10 @@ MGALeaveVT(VT_FUNC_ARGS_DECL)
     ScreenPtr pScreen;
 #endif
 
-    MGARestore(pScrn);
+    if (pMga->randr12)
+	MGARandR12Restore(pScrn);
+    else
+	MGARestore(pScrn);
     vgaHWLock(hwp);
 
 #ifdef MGADRI
@@ -3616,7 +3794,10 @@ MGACloseScreen(CLOSE_SCREEN_ARGS_DECL)
 	    fbdevHWRestore(pScrn);
 	    MGAUnmapMem(pScrn);
         } else {
-	    MGARestore(pScrn);
+	    if (pMga->randr12)
+		MGARandR12Restore(pScrn);
+	    else
+		MGARestore(pScrn);
 	    vgaHWLock(hwp);
 	    MGAUnmapMem(pScrn);
 	    vgaHWUnmapMem(pScrn);
