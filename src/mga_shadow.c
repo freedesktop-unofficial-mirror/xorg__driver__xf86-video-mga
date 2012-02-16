@@ -23,7 +23,10 @@ MGARefreshArea(ScrnInfoPtr pScrn, int num, BoxPtr pbox)
     unsigned char *src, *dst;
    
     Bpp = pScrn->bitsPerPixel >> 3;
-    FBPitch = BitmapBytePad(pScrn->displayWidth * pScrn->bitsPerPixel);
+    if (pMga->randr12)
+	FBPitch = BitmapBytePad(pScrn->virtualX * pScrn->bitsPerPixel);
+    else
+	FBPitch = BitmapBytePad(pScrn->displayWidth * pScrn->bitsPerPixel);
 
     while(num--) {
 	width = (pbox->x2 - pbox->x1) * Bpp;
@@ -32,7 +35,8 @@ MGARefreshArea(ScrnInfoPtr pScrn, int num, BoxPtr pbox)
 						(pbox->x1 * Bpp);
 	dst = pMga->FbStart + (pbox->y1 * FBPitch) + (pbox->x1 * Bpp);
 
-	while(height--) {
+	/* the && here is just fucking revolting */
+	while(height-- && (dst >= pMga->FbStart)) {
 	    memcpy(dst, src, width);
 	    dst += FBPitch;
 	    src += pMga->ShadowPitch;
