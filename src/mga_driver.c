@@ -1953,12 +1953,6 @@ MGAPreInit(ScrnInfoPtr pScrn, int flags)
 			  (1 << pScrn->offset.green) |
         (((pScrn->mask.blue >> pScrn->offset.blue) - 1) << pScrn->offset.blue);
     }
-    if (xf86ReturnOptValBool(pMga->Options, OPTION_SHADOW_FB, FALSE)) {
-	pMga->ShadowFB = TRUE;
-	pMga->NoAccel = TRUE;
-	xf86DrvMsg(pScrn->scrnIndex, X_CONFIG,
-		"Using \"Shadow Framebuffer\" - acceleration disabled\n");
-    }
     if (xf86ReturnOptValBool(pMga->Options, OPTION_OVERCLOCK_MEM, FALSE)) {
 	pMga->OverclockMem = TRUE;
 	xf86DrvMsg(pScrn->scrnIndex, X_CONFIG, "Overclocking memory\n");
@@ -1995,6 +1989,18 @@ MGAPreInit(ScrnInfoPtr pScrn, int flags)
 	default:
 	    pMga->randr12 = FALSE;
 	}
+    }
+
+    if (pMga->randr12) {
+	pMga->ShadowFB = TRUE;
+	pMga->NoAccel = TRUE;
+	xf86DrvMsg(pScrn->scrnIndex, X_PROBED,
+		   "Using shadowfb for RANDR 1.2 support\n");
+    } else if (xf86ReturnOptValBool(pMga->Options, OPTION_SHADOW_FB, FALSE)) {
+	pMga->ShadowFB = TRUE;
+	pMga->NoAccel = TRUE;
+	xf86DrvMsg(pScrn->scrnIndex, X_CONFIG,
+		"Using \"Shadow Framebuffer\" - acceleration disabled\n");
     }
 
     if (pMga->FBDev) {
