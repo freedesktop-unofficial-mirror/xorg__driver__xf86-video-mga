@@ -519,8 +519,9 @@ MGAGSetPCLK(xf86CrtcPtr crtc, MgaCrtcStatePtr state, long f_out)
     /* Pixel clock values */
     int m, n, p;
 
+    state->clock = f_out;
+
     if (MGAISGx50(pMga)) {
-        state->clock = f_out;
         return;
     }
 
@@ -915,6 +916,66 @@ state_restore(xf86CrtcPtr crtc, MgaCrtcStatePtr state,
 
         if (vga_flags & VGA_SR_FONTS)
             MGAG200SERestoreFonts(scrn, vga);
+
+	/*
+	 This function optimize the Priority Request control
+	 Higher HiPriLvl will reduce drawing performance
+	 We need to give enough bandwith to crtc to avoid visual artifact
+	*/
+        if (pMga->reg_1e24 >= 0x02)
+        {
+            /* Calulate CRTC Priority value */
+            CARD8  ucHiPriLvl;
+            CARD32 ulBitsPerPixel;
+            CARD32 ulMemoryBandwidth;
+
+            /* uiBitsPerPixel can only be 8,16 or32 */
+            if (scrn->bitsPerPixel > 16)
+            {
+                ulBitsPerPixel = 32;
+            }
+            else if (scrn->bitsPerPixel >  8)
+            {
+                ulBitsPerPixel = 16;
+            }
+            else
+            {
+                ulBitsPerPixel = 8;
+            }
+
+            ulMemoryBandwidth = (state->clock * ulBitsPerPixel) / 1000;
+
+            if      (ulMemoryBandwidth    > 3100)  ucHiPriLvl = 0;
+            else if (ulMemoryBandwidth    > 2600)  ucHiPriLvl = 1;
+            else if (ulMemoryBandwidth    > 1900)  ucHiPriLvl = 2;
+            else if (ulMemoryBandwidth    > 1160)  ucHiPriLvl = 3;
+            else if (ulMemoryBandwidth    > 440)   ucHiPriLvl = 4;
+            else ucHiPriLvl = 5;
+
+            OUTREG8(0x1FDE, 0x06);
+		    OUTREG8(0x1FDF, ucHiPriLvl);
+
+            xf86DrvMsg(scrn->scrnIndex, X_INFO, "Clock           == %d\n",   state->clock);
+            xf86DrvMsg(scrn->scrnIndex, X_INFO, "BitsPerPixel    == %d\n",   scrn->bitsPerPixel);
+            xf86DrvMsg(scrn->scrnIndex, X_INFO, "MemoryBandwidth == %d\n",   ulMemoryBandwidth);
+            xf86DrvMsg(scrn->scrnIndex, X_INFO, "HiPriLvl        == %02X\n", ucHiPriLvl);
+        }
+        else
+        {
+                xf86DrvMsg(scrn->scrnIndex, X_INFO, "Clock           == %d\n",   state->clock);
+                xf86DrvMsg(scrn->scrnIndex, X_INFO, "BitsPerPixel    == %d\n",   scrn->bitsPerPixel);
+                OUTREG8(0x1FDE, 0x06);
+		if (pMga->reg_1e24 >= 0x01)
+                {
+		            OUTREG8(0x1FDF, 0x03);
+                    xf86DrvMsg(scrn->scrnIndex, X_INFO, "HiPriLvl        == 03\n");
+                }
+		else
+                {
+		            OUTREG8(0x1FDF, 0x14);
+                    xf86DrvMsg(scrn->scrnIndex, X_INFO, "HiPriLvl        == 14h\n");
+                }
+        }
     } else
         vgaHWRestore(scrn, vga, vga_flags & ~VGA_SR_CMAP);
 
