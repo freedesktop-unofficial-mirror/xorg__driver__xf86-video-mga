@@ -150,7 +150,12 @@ output_dac1_dpms(xf86OutputPtr output, int mode)
     OUTREG8(MGAREG_CRTCEXT_DATA, crtcext1);
 #endif
 
+#if 0
+    /* this is wrong on at least EV and EH */
     output1_dpms(output, mode);
+#endif
+
+    MGADisplayPowerManagementSet(output->scrn, mode, 0);
 }
 
 static void
