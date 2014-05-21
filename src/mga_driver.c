@@ -2189,7 +2189,7 @@ MGAPreInit(ScrnInfoPtr pScrn, int flags)
 	xf86CrtcConfigInit(pScrn, &crtc_config_funcs);
 
 	/* who even knows if this is accurate */
-	xf86CrtcSetSizeRange(pScrn, 320, 200, 2560, 1024);
+	xf86CrtcSetSizeRange(pScrn, 320, 200, 2048, 2048);
 
 	MGAGCrtc1Init(pScrn);
 	if (pMga->i2cInit)
@@ -3909,11 +3909,9 @@ xf86ModeBandwidth(DisplayModePtr mode, int depth)
 
 /* Checks if a mode is suitable for the selected chipset. */
 
-/* Optional */
-static ModeStatus
-MGAValidMode(SCRN_ARG_TYPE arg, DisplayModePtr mode, Bool verbose, int flags)
+ModeStatus
+mga_valid_mode(ScrnInfoPtr pScrn, DisplayModePtr mode, int flags)
 {
-    SCRN_INFO_PTR(arg);
     int lace;
     MGAPtr pMga = MGAPTR(pScrn);
 
@@ -3980,6 +3978,16 @@ MGAValidMode(SCRN_ARG_TYPE arg, DisplayModePtr mode, Bool verbose, int flags)
     } else {
 	return(MODE_BAD);
     }
+
+}
+
+/* Optional */
+static ModeStatus
+MGAValidMode(SCRN_ARG_TYPE arg, DisplayModePtr mode, Bool verbose, int flags)
+{
+    SCRN_INFO_PTR(arg);
+
+    return mga_valid_mode(pScrn, mode, flags);
 }
 
 

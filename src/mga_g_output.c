@@ -171,7 +171,7 @@ output_restore(xf86OutputPtr output)
 static int
 output_mode_valid(xf86OutputPtr output, DisplayModePtr mode)
 {
-    return MODE_OK;
+    return mga_valid_mode(output->scrn, mode, 0);
 }
 
 static Bool

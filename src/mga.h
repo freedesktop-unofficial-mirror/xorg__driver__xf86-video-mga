@@ -817,4 +817,7 @@ MGA_SYNC(MGAPtr pMga, ScrnInfoPtr pScrn)
 #endif
 }
 
+ModeStatus
+mga_valid_mode(ScrnInfoPtr pScrn, DisplayModePtr mode, int flags);
+
 #endif
